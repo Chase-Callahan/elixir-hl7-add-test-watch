@@ -14,7 +14,7 @@ defmodule HL7Test do
 
   @wiki_text HL7.Examples.wikipedia_sample_hl7()
 
-  doctest HL7
+  doctest HL7, import: true
   import HL7
 
   describe "HL7.get/2" do
@@ -830,6 +830,58 @@ defmodule HL7Test do
                "",
                "F"
              ] == Enum.at(list, 4)
+    end
+  end
+
+  describe "HL7.empty?/2" do
+    test "returns true when selecting repetitions that are all empty from multiple segments" do
+      hl7 = new!(@wiki_text)
+
+      assert empty?(hl7, ~p"OBX[*]-999[*]")
+    end
+
+    test "returns false when selecting repetitions that are partially full from multiple segments" do
+      hl7 =
+        new!(@wiki_text <> "\nOBX|3")
+        |> put(~p"OBX[2]-100[1]", "FOO")
+        |> put(~p"OBX[2]-100[2]", "BAR")
+        |> put(~p"OBX[3]-100[2]", "BUZ")
+
+      refute empty?(hl7, ~p"OBX[*]-100[*]")
+    end
+
+    test "returns false when selecting a field which has components that contain data" do
+      hl7 = new!(@wiki_text) |> put(~p"PID-20.1", "FOO") |> put(~p"PID-20.2", "BUZZ")
+
+      refute empty?(hl7, ~p"PID-20")
+    end
+
+    test "returns true when a field is selected which has a 2nd component that has a 1st sub-component with an empty value" do
+      hl7 = new!(@wiki_text) |> put(~p"PID-20.2.1", "")
+
+      assert empty?(hl7, ~p"PID-20")
+    end
+
+    test "returns true when selecting a single segment that does not exist" do
+      hl7 = new!(@wiki_text)
+
+      assert empty?(hl7, ~p"ZZZ")
+    end
+
+    test "returns true when selecting empty field from multiple segments" do
+      hl7 = new!(@wiki_text)
+
+      assert empty?(hl7, ~p"OBX[*]-999")
+    end
+
+    test "returns false when only some values are found in a field across multiple segments" do
+      hl7 =
+        new!(@wiki_text <> "\nOBX|3")
+        |> put(~p"OBX[1]-20", "")
+        |> put(~p"OBX[2]-20", "SOMETHING")
+        |> put(~p"OBX[3]-20", "")
+
+      refute empty?(hl7, ~p"OBX[*]-20")
     end
   end
 
